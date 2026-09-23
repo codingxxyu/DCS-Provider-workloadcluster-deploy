@@ -31,11 +31,13 @@ spec:
               "streamingConnectionIdleTimeout": "5m",
               "clientCAFile": "/etc/kubernetes/pki/ca.crt"
             }
+      # Official DCS appendix: only the three commands below.
+      # Do not append cloud.alauda.io to /etc/hosts (BM leftover; file is not writable).
+      # If the VM is up and cloud.alauda.io does not resolve, add the hosts entry by hand.
       preKubeadmCommands:
         - while ! ip route | grep -q "default via"; do sleep 1; done; echo "NetworkManager started"
         - mkdir -p /run/cluster-api && restorecon -Rv /run/cluster-api
         - if [ -f /etc/disk-setup.sh ]; then bash /etc/disk-setup.sh; fi
-        - 'grep -q cloud.alauda.io /etc/hosts || echo "127.0.0.1 cloud.alauda.io" >> /etc/hosts'
       postKubeadmCommands:
         - chmod 600 /var/lib/kubelet/config.yaml
       joinConfiguration:

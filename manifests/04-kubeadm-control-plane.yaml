@@ -182,11 +182,15 @@ spec:
             - group: "operator.connectors.alauda.io"
               resources: ["connectorscores", "connectorsgits", "connectorsocis"]
           - level: Metadata
+    # Official DCS appendix: only the three commands below.
+    # Do not append cloud.alauda.io to /etc/hosts here. That line is a BM leftover.
+    # Alauda OS /etc/hosts is not writable; kubeadm.service then fails with Permission denied.
+    # If the VM is up and cloud.alauda.io does not resolve, add the hosts entry by hand
+    # on the VM. Do not put that command back into this YAML.
     preKubeadmCommands:
       - while ! ip route | grep -q "default via"; do sleep 1; done; echo "NetworkManager started"
       - mkdir -p /run/cluster-api && restorecon -Rv /run/cluster-api
       - if [ -f /etc/disk-setup.sh ]; then bash /etc/disk-setup.sh; fi
-      - 'grep -q cloud.alauda.io /etc/hosts || echo "127.0.0.1 cloud.alauda.io" >> /etc/hosts'
     postKubeadmCommands:
       - chmod 600 /var/lib/kubelet/config.yaml
     clusterConfiguration:

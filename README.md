@@ -257,13 +257,12 @@ data:
   kubernetesVersion: v1.34.5-3
   corednsTag: 1.14.2-v4.3.11
   etcdTag: v3.5.28-260625
-  vmImageVersion: <alauda-os-vm-image-version>
 ```
 
 | 字段 | 本环境 | 其他环境 |
 |---|---|---|
 | `cpaas.io/dcs-vm-template` | 已是 `slem-alaudaos-vda`。不要写成旁边的 `44slem-alaudaos-vda` | 那个环境 DCS 上的模板名，不要抄旧环境 `aladuaos-0819` |
-| `vmImageVersion` | 该模板对应的 Alauda OS 镜像版本。**怎么看：** [DCS 控制台] Resource Pool → VM Templates → 点开 `slem-alaudaos-vda` → Summary / Basic Information 里的 Image Version / OS Version / 镜像版本。不要用模板显示名，不要用 `44slem-alaudaos-vda` 的版本。截图发我就能写进 `00` | 同上，对不上模板内置版本就停止 |
+| `vmImageVersion` | **本次 YAML 不写。** 产研确认这个字段只给 UI 下拉用。不要抄文档 4.2 示例 `alaudaos-42.m55.202512081125-0.x86_64` | 走 YAML 同样不写；只有走门户创建集群才需要 |
 | `kubernetesVersion` / `corednsTag` / `etcdTag` | 已按 4.3.2 写好，不要改 | 仍是 ACP 4.3.2 就保持；不是 4.3.2 不要用本仓库 |
 
 ### 5.2 `manifests/01-dcs-secret.example.yaml`（禁止 apply）
@@ -359,6 +358,17 @@ stringData:
 ### 5.5 `manifests/04-kubeadm-control-plane.yaml`
 
 只改公钥这一行。写公钥文本本身，不要写文件路径，不要写 `$(cat ...)`。`PROVIDER_ID` / `NODE_IP` 保持字面量。`machineTemplate.infrastructureRef.name` 必须是 `dcs-workloadcluster-cp-template`。
+
+`preKubeadmCommands` 只保留官方 DCS 附录那三条（等默认路由、`restorecon`、`disk-setup.sh`）。**不要**从 BM 流程抄 `echo "127.0.0.1 cloud.alauda.io" >> /etc/hosts`。Alauda OS 上 `/etc/hosts` 不可写，写进去会 `Permission denied`，`kubeadm.service` 起不来，Node 永远挂不上。
+
+VM 起来之后如果 `cloud.alauda.io` 没有解析，用 `boot` SSH 进虚拟机手动加这一条，不要写回 YAML：
+
+```bash
+# 仅当 getent hosts cloud.alauda.io 失败时才做
+sudo sh -c 'grep -q cloud.alauda.io /etc/hosts || echo "127.0.0.1 cloud.alauda.io" >> /etc/hosts'
+```
+
+若 `/etc/hosts` 仍然 Permission denied（immutable / 只读根），不要在 YAML 里再加命令；按现场 OS 方式改（例如 `chattr -i` 后再追加），改完再 `systemctl restart kubeadm`，不要 `restart kubelet`。
 
 ```yaml
         sshAuthorizedKeys:
@@ -524,6 +534,7 @@ spec:
 - 预填控制器计算出来的 annotation（`cpaas.io/cpu-cores-number` 等）
 - 给 Alauda OS 写 `cpaas.io/os-family: kubeos`（只有 KubeOS 才写；不写则按 slemicro）
 - 把 BM 的 Registration / SeedImage / Inventory / ISO / VLAN nmcli 写进本流程
+- 把 BM 的 `echo "127.0.0.1 cloud.alauda.io" >> /etc/hosts` 写进 DCS 的 `preKubeadmCommands`（`/etc/hosts` 不可写）
 - `kubectl apply -f manifests/` 一把梭
 
 ## 6. [Global Master 01] DCS VM 模板 ConfigMap
@@ -647,7 +658,7 @@ vi manifests/04-kubeadm-control-plane.yaml
 grep -nE '<[^>]+>|填写实际' manifests/04-kubeadm-control-plane.yaml
 ```
 
-这里不应该再有 `<...>`。`PROVIDER_ID` / `NODE_IP` 必须还在。
+这里不应该再有 `<...>`。`PROVIDER_ID` / `NODE_IP` 必须还在。`preKubeadmCommands` 必须正好 3 条，不要出现 `>> /etc/hosts`。
 
 ```bash
 kubectl apply --dry-run=server -f manifests/04-kubeadm-control-plane.yaml
@@ -656,6 +667,8 @@ kubectl -n cpaas-system get kubeadmcontrolplane dcs-workloadcluster-kcp
 ```
 
 这一步还不会真正克隆 VM。CAPI 要等 `Cluster` 把 KCP 和 `DCSCluster` 绑在一起之后才开始。
+
+**注意（和 BM 的区别）：** DCS / Alauda OS 的 `/etc/hosts` 默认不可写。官方附录不往里面追加 `cloud.alauda.io`。需要解析时等虚拟机起来，SSH 进去手动加，见 5.5。已经因这一行失败的 CP VM：改 YAML 不会重跑这台机上的 `preKubeadmCommands`，要在虚拟机里处理。
 
 ### 8.3 DCSCluster 和 Cluster
 
