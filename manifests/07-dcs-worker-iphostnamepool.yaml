@@ -1,0 +1,52 @@
+# Worker DCSIpHostnamePool. Three entries for HA 3+3.
+# Same field rules as the control-plane pool.
+# Do not reuse control-plane IPs, VIP, or olvm-workloadcluster addresses.
+apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
+kind: DCSIpHostnamePool
+metadata:
+  name: dcs-workloadcluster-worker-ippool
+  namespace: cpaas-system
+spec:
+  pool:
+    - ip: "<worker-ip-1>"
+      mask: "<worker-cidr-prefix-length>"
+      gateway: "<worker-gateway>"
+      dns: "<worker-dns>"
+      hostname: "dcs-workloadcluster-worker-1"
+      machineName: "dcs-workloadcluster-worker-1"
+      persistentDisk:
+        - slot: 0
+          quantityGB: <cpaas-disk-gb>
+          datastoreClusterName: <datastore-cluster-name>
+          path: /var/cpaas
+          format: xfs
+          mountOptions:
+            - defaults
+    - ip: "<worker-ip-2>"
+      mask: "<worker-cidr-prefix-length>"
+      gateway: "<worker-gateway>"
+      dns: "<worker-dns>"
+      hostname: "dcs-workloadcluster-worker-2"
+      machineName: "dcs-workloadcluster-worker-2"
+      persistentDisk:
+        - slot: 0
+          quantityGB: <cpaas-disk-gb>
+          datastoreClusterName: <datastore-cluster-name>
+          path: /var/cpaas
+          format: xfs
+          mountOptions:
+            - defaults
+    - ip: "<worker-ip-3>"
+      mask: "<worker-cidr-prefix-length>"
+      gateway: "<worker-gateway>"
+      dns: "<worker-dns>"
+      hostname: "dcs-workloadcluster-worker-3"
+      machineName: "dcs-workloadcluster-worker-3"
+      persistentDisk:
+        - slot: 0
+          quantityGB: <cpaas-disk-gb>
+          datastoreClusterName: <datastore-cluster-name>
+          path: /var/cpaas
+          format: xfs
+          mountOptions:
+            - defaults

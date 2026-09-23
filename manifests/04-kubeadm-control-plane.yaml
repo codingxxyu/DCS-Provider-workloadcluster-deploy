@@ -1,0 +1,248 @@
+# Official ACP 4.3.2 DCS KubeadmControlPlane (full appendix YAML).
+# Kubernetes is v1.34.5-3: do NOT set imagePullCredentialsVerificationPolicy
+# (that field is required only from Kubernetes 1.35).
+# Replace sshAuthorizedKeys with the Global Master 01 public key before apply.
+# Leave PROVIDER_ID and NODE_IP as literal tokens. The DCS provider fills them.
+# Do not write encryption-provider.conf into files[]; the DCS provider injects it.
+apiVersion: controlplane.cluster.x-k8s.io/v1beta1
+kind: KubeadmControlPlane
+metadata:
+  name: dcs-workloadcluster-kcp
+  namespace: cpaas-system
+  annotations:
+    controlplane.cluster.x-k8s.io/skip-coredns: ""
+    controlplane.cluster.x-k8s.io/skip-kube-proxy: ""
+spec:
+  replicas: 3
+  version: v1.34.5-3
+  rolloutStrategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 0
+  machineTemplate:
+    nodeDrainTimeout: 1m
+    nodeDeletionTimeout: 5m
+    infrastructureRef:
+      apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
+      kind: DCSMachineTemplate
+      name: dcs-workloadcluster-cp-template
+  kubeadmConfigSpec:
+    format: ignition
+    users:
+      - name: boot
+        sudo: ALL=(ALL) NOPASSWD:ALL
+        shell: /bin/bash
+        sshAuthorizedKeys:
+          - "<ssh-authorized-keys>"
+    files:
+      - path: /etc/kubernetes/admission/psa-config.yaml
+        owner: "root:root"
+        permissions: "0644"
+        content: |
+          apiVersion: apiserver.config.k8s.io/v1
+          kind: AdmissionConfiguration
+          plugins:
+          - name: PodSecurity
+            configuration:
+              apiVersion: pod-security.admission.config.k8s.io/v1
+              kind: PodSecurityConfiguration
+              defaults:
+                enforce: "privileged"
+                enforce-version: "latest"
+                audit: "baseline"
+                audit-version: "latest"
+                warn: "baseline"
+                warn-version: "latest"
+              exemptions:
+                usernames: []
+                runtimeClasses: []
+                namespaces:
+                - kube-system
+                - cpaas-system
+      - path: /etc/kubernetes/patches/kubeletconfiguration0+strategic.json
+        owner: "root:root"
+        permissions: "0644"
+        content: |
+          {
+            "apiVersion": "kubelet.config.k8s.io/v1beta1",
+            "kind": "KubeletConfiguration",
+            "protectKernelDefaults": true,
+            "tlsCertFile": "/etc/kubernetes/pki/kubelet.crt",
+            "tlsPrivateKeyFile": "/etc/kubernetes/pki/kubelet.key",
+            "streamingConnectionIdleTimeout": "5m",
+            "clientCAFile": "/etc/kubernetes/pki/ca.crt"
+          }
+      - path: /etc/kubernetes/audit/policy.yaml
+        owner: "root:root"
+        append: false
+        permissions: "0644"
+        content: |
+          apiVersion: audit.k8s.io/v1
+          kind: Policy
+          omitStages:
+          - "RequestReceived"
+          rules:
+          - level: None
+            users:
+            - system:kube-controller-manager
+            - system:kube-scheduler
+            - system:serviceaccount:kube-system:endpoint-controller
+            verbs: ["get", "update"]
+            namespaces: ["kube-system"]
+            resources:
+            - group: ""
+              resources: ["endpoints"]
+          - level: None
+            nonResourceURLs:
+            - /healthz*
+            - /version
+            - /swagger*
+          - level: None
+            resources:
+            - group: ""
+              resources: ["events"]
+          - level: None
+            resources:
+            - group: "devops.alauda.io"
+          - level: None
+            verbs: ["get", "list", "watch"]
+          - level: None
+            resources:
+            - group: "coordination.k8s.io"
+              resources: ["leases"]
+          - level: None
+            resources:
+            - group: "authorization.k8s.io"
+              resources: ["subjectaccessreviews", "selfsubjectaccessreviews"]
+            - group: "authentication.k8s.io"
+              resources: ["tokenreviews"]
+          - level: None
+            resources:
+            - group: "app.alauda.io"
+              resources: ["imagewhitelists"]
+            - group: "k8s.io"
+              resources: ["namespaceoverviews"]
+          - level: Metadata
+            resources:
+            - group: ""
+              resources: ["secrets", "configmaps"]
+          - level: Metadata
+            resources:
+            - group: "operator.connectors.alauda.io"
+              resources: ["installmanifests"]
+            - group: "operators.katanomi.dev"
+              resources: ["katanomis"]
+          - level: RequestResponse
+            resources:
+            - group: ""
+            - group: "aiops.alauda.io"
+            - group: "apps"
+            - group: "app.k8s.io"
+            - group: "authentication.istio.io"
+            - group: "auth.alauda.io"
+            - group: "autoscaling"
+            - group: "asm.alauda.io"
+            - group: "clusterregistry.k8s.io"
+            - group: "crd.alauda.io"
+            - group: "infrastructure.alauda.io"
+            - group: "monitoring.coreos.com"
+            - group: "operators.coreos.com"
+            - group: "networking.istio.io"
+            - group: "extensions.istio.io"
+            - group: "install.istio.io"
+            - group: "security.istio.io"
+            - group: "telemetry.istio.io"
+            - group: "opentelemetry.io"
+            - group: "networking.k8s.io"
+            - group: "portal.alauda.io"
+            - group: "rbac.authorization.k8s.io"
+            - group: "storage.k8s.io"
+            - group: "tke.cloud.tencent.com"
+            - group: "devopsx.alauda.io"
+            - group: "core.katanomi.dev"
+            - group: "deliveries.katanomi.dev"
+            - group: "integrations.katanomi.dev"
+            - group: "artifacts.katanomi.dev"
+            - group: "builds.katanomi.dev"
+            - group: "versioning.katanomi.dev"
+            - group: "sources.katanomi.dev"
+            - group: "tekton.dev"
+            - group: "operator.tekton.dev"
+            - group: "eventing.knative.dev"
+            - group: "flows.knative.dev"
+            - group: "messaging.knative.dev"
+            - group: "operator.knative.dev"
+            - group: "sources.knative.dev"
+            - group: "operator.devops.alauda.io"
+            - group: "flagger.app"
+            - group: "jaegertracing.io"
+            - group: "velero.io"
+              resources: ["deletebackuprequests"]
+            - group: "connectors.alauda.io"
+            - group: "operator.connectors.alauda.io"
+              resources: ["connectorscores", "connectorsgits", "connectorsocis"]
+          - level: Metadata
+    preKubeadmCommands:
+      - while ! ip route | grep -q "default via"; do sleep 1; done; echo "NetworkManager started"
+      - mkdir -p /run/cluster-api && restorecon -Rv /run/cluster-api
+      - if [ -f /etc/disk-setup.sh ]; then bash /etc/disk-setup.sh; fi
+      - 'grep -q cloud.alauda.io /etc/hosts || echo "127.0.0.1 cloud.alauda.io" >> /etc/hosts'
+    postKubeadmCommands:
+      - chmod 600 /var/lib/kubelet/config.yaml
+    clusterConfiguration:
+      imageRepository: cloud.alauda.io/alauda
+      dns:
+        imageTag: 1.14.2-v4.3.11
+      etcd:
+        local:
+          imageTag: v3.5.28-260625
+      apiServer:
+        extraArgs:
+          audit-log-format: json
+          audit-log-maxage: "30"
+          audit-log-maxbackup: "10"
+          audit-log-maxsize: "200"
+          profiling: "false"
+          audit-log-mode: batch
+          audit-log-path: /etc/kubernetes/audit/audit.log
+          audit-policy-file: /etc/kubernetes/audit/policy.yaml
+          tls-cipher-suites: "TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305,TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305,TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384"
+          encryption-provider-config: /etc/kubernetes/encryption-provider.conf
+          admission-control-config-file: /etc/kubernetes/admission/psa-config.yaml
+          tls-min-version: VersionTLS12
+          kubelet-certificate-authority: /etc/kubernetes/pki/ca.crt
+        extraVolumes:
+          - name: vol-dir-0
+            hostPath: /etc/kubernetes
+            mountPath: /etc/kubernetes
+            pathType: Directory
+      controllerManager:
+        extraArgs:
+          bind-address: "::"
+          profiling: "false"
+          tls-min-version: VersionTLS12
+          flex-volume-plugin-dir: "/opt/libexec/kubernetes/kubelet-plugins/volume/exec/"
+      scheduler:
+        extraArgs:
+          bind-address: "::"
+          tls-min-version: VersionTLS12
+          profiling: "false"
+    initConfiguration:
+      patches:
+        directory: /etc/kubernetes/patches
+      nodeRegistration:
+        kubeletExtraArgs:
+          node-labels: "kube-ovn/role=master"
+          provider-id: PROVIDER_ID
+          volume-plugin-dir: "/opt/libexec/kubernetes/kubelet-plugins/volume/exec/"
+          protect-kernel-defaults: "true"
+    joinConfiguration:
+      patches:
+        directory: /etc/kubernetes/patches
+      nodeRegistration:
+        kubeletExtraArgs:
+          node-ip: NODE_IP
+          node-labels: "kube-ovn/role=master"
+          provider-id: PROVIDER_ID
+          volume-plugin-dir: "/opt/libexec/kubernetes/kubelet-plugins/volume/exec/"
+          protect-kernel-defaults: "true"

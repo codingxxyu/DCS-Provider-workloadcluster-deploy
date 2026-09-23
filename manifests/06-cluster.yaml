@@ -1,0 +1,40 @@
+# CAPI Cluster for the DCS workload.
+# Name must match DCSCluster. Must not be global.
+# Must not set is-global: "true" (that label is only for the Global cluster).
+# CIDRs must not overlap Global, olvm-workloadcluster, host networks, or each other.
+# olvm-workloadcluster already uses:
+#   pods 100.13.0.0/16  services 100.14.0.0/16  join 100.15.0.0/16
+# Registry is read at create time and cannot be migrated later.
+# Do not pre-set controller-computed annotations such as cpaas.io/cpu-cores-number.
+# Alauda OS: omit cpaas.io/os-family (unset is treated as slemicro).
+apiVersion: cluster.x-k8s.io/v1beta1
+kind: Cluster
+metadata:
+  name: dcs-workloadcluster
+  namespace: cpaas-system
+  labels:
+    cluster-type: DCS
+  annotations:
+    capi.cpaas.io/resource-group-version: infrastructure.cluster.x-k8s.io/v1beta1
+    capi.cpaas.io/resource-kind: DCSCluster
+    capi.cpaas.io/kubernetes: v1.34.5-3
+    cpaas.io/kube-ovn-join-cidr: <kube-ovn-join-cidr>
+    cpaas.io/kube-ovn-version: v4.3.11
+    cpaas.io/registry-address: 10.243.166.5:11443
+    cpaas.io/nodes-mode: self-managed
+spec:
+  clusterNetwork:
+    pods:
+      cidrBlocks:
+        - <pods-cidr>
+    services:
+      cidrBlocks:
+        - <services-cidr>
+  controlPlaneRef:
+    apiVersion: controlplane.cluster.x-k8s.io/v1beta1
+    kind: KubeadmControlPlane
+    name: dcs-workloadcluster-kcp
+  infrastructureRef:
+    apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
+    kind: DCSCluster
+    name: dcs-workloadcluster

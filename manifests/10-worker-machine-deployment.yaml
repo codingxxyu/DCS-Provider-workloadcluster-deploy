@@ -1,0 +1,41 @@
+# Official ACP 4.3.2 DCS worker MachineDeployment.
+# HA topology for this project: replicas 3 (Master 3 + Worker 3).
+# Pool-managed persistent disks require maxSurge 0.
+apiVersion: cluster.x-k8s.io/v1beta1
+kind: MachineDeployment
+metadata:
+  name: dcs-workloadcluster-worker-deployment
+  namespace: cpaas-system
+spec:
+  clusterName: dcs-workloadcluster
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 0
+      maxUnavailable: 1
+  selector:
+    matchLabels:
+      cluster.x-k8s.io/deployment-name: dcs-workloadcluster-worker-deployment
+  template:
+    metadata:
+      labels:
+        cluster.x-k8s.io/deployment-name: dcs-workloadcluster-worker-deployment
+        cluster.x-k8s.io/cluster-name: dcs-workloadcluster
+        pool.name: dcs-workloadcluster-worker-deployment
+    spec:
+      clusterName: dcs-workloadcluster
+      version: v1.34.5-3
+      nodeDrainTimeout: 1m
+      nodeDeletionTimeout: 5m
+      bootstrap:
+        configRef:
+          apiVersion: bootstrap.cluster.x-k8s.io/v1beta1
+          kind: KubeadmConfigTemplate
+          name: dcs-workloadcluster-worker-kct
+          namespace: cpaas-system
+      infrastructureRef:
+        apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
+        kind: DCSMachineTemplate
+        name: dcs-workloadcluster-worker-template
+        namespace: cpaas-system

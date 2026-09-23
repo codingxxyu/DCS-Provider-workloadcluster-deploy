@@ -1,0 +1,37 @@
+# Worker DCSMachineTemplate.
+# Official required disks for worker:
+#   systemVolume, /var/lib/kubelet 100G, /var/lib/containerd 100G.
+# No /var/lib/etcd on workers. /var/cpaas is on the worker IP pool.
+apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
+kind: DCSMachineTemplate
+metadata:
+  name: dcs-workloadcluster-worker-template
+  namespace: cpaas-system
+spec:
+  template:
+    spec:
+      vmTemplateName: <alauda-os-vm-template-name>
+      location:
+        type: folder
+        name: <dcs-vm-folder-name>
+      vmConfig:
+        dvSwitchName: <dv-switch-name>
+        portGroupName: <port-group-name>
+        dcsMachineCpuSpec:
+          quantity: <worker-cpu-cores>
+        dcsMachineMemorySpec:
+          quantity: <worker-memory-mb>
+        dcsMachineDiskSpec:
+          - quantity: 0
+            datastoreClusterName: <datastore-cluster-name>
+            systemVolume: true
+          - quantity: 100
+            datastoreClusterName: <datastore-cluster-name>
+            path: /var/lib/kubelet
+            format: xfs
+          - quantity: 100
+            datastoreClusterName: <datastore-cluster-name>
+            path: /var/lib/containerd
+            format: xfs
+      ipHostPoolRef:
+        name: dcs-workloadcluster-worker-ippool

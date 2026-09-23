@@ -1,0 +1,56 @@
+# Control-plane DCSIpHostnamePool.
+# Official fields: ip, mask, gateway, dns, hostname, machineName, persistentDisk.
+# mask is CIDR prefix length only, for example "24". Do not write /24 or 255.255.255.0.
+# dns is a string. Separate multiple servers with ";".
+# /var/cpaas belongs here, not on DCSMachineTemplate.
+# Pool size must be >= KubeadmControlPlane.spec.replicas (this project: 3).
+# Do not reuse IPs from olvm-workloadcluster or any other live DCSIpHostnamePool.
+apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
+kind: DCSIpHostnamePool
+metadata:
+  name: dcs-workloadcluster-cp-ippool
+  namespace: cpaas-system
+spec:
+  pool:
+    - ip: "<cp-ip-1>"
+      mask: "<cp-cidr-prefix-length>"
+      gateway: "<cp-gateway>"
+      dns: "<cp-dns>"
+      hostname: "dcs-workloadcluster-cp-1"
+      machineName: "dcs-workloadcluster-cp-1"
+      persistentDisk:
+        - slot: 0
+          quantityGB: <cpaas-disk-gb>
+          datastoreClusterName: <datastore-cluster-name>
+          path: /var/cpaas
+          format: xfs
+          mountOptions:
+            - defaults
+    - ip: "<cp-ip-2>"
+      mask: "<cp-cidr-prefix-length>"
+      gateway: "<cp-gateway>"
+      dns: "<cp-dns>"
+      hostname: "dcs-workloadcluster-cp-2"
+      machineName: "dcs-workloadcluster-cp-2"
+      persistentDisk:
+        - slot: 0
+          quantityGB: <cpaas-disk-gb>
+          datastoreClusterName: <datastore-cluster-name>
+          path: /var/cpaas
+          format: xfs
+          mountOptions:
+            - defaults
+    - ip: "<cp-ip-3>"
+      mask: "<cp-cidr-prefix-length>"
+      gateway: "<cp-gateway>"
+      dns: "<cp-dns>"
+      hostname: "dcs-workloadcluster-cp-3"
+      machineName: "dcs-workloadcluster-cp-3"
+      persistentDisk:
+        - slot: 0
+          quantityGB: <cpaas-disk-gb>
+          datastoreClusterName: <datastore-cluster-name>
+          path: /var/cpaas
+          format: xfs
+          mountOptions:
+            - defaults

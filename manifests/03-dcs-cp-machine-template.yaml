@@ -1,0 +1,43 @@
+# Control-plane DCSMachineTemplate.
+# Official required disks for control plane:
+#   systemVolume, /var/lib/kubelet 100G, /var/lib/containerd 100G, /var/lib/etcd 10G.
+# quantity 0 on systemVolume means use the Alauda OS VM template disk size.
+# Memory quantity is MB. CPU quantity is cores.
+# /var/cpaas is declared on the IP pool, not here.
+apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
+kind: DCSMachineTemplate
+metadata:
+  name: dcs-workloadcluster-cp-template
+  namespace: cpaas-system
+spec:
+  template:
+    spec:
+      vmTemplateName: <alauda-os-vm-template-name>
+      location:
+        type: folder
+        name: <dcs-vm-folder-name>
+      vmConfig:
+        dvSwitchName: <dv-switch-name>
+        portGroupName: <port-group-name>
+        dcsMachineCpuSpec:
+          quantity: <cp-cpu-cores>
+        dcsMachineMemorySpec:
+          quantity: <cp-memory-mb>
+        dcsMachineDiskSpec:
+          - quantity: 0
+            datastoreClusterName: <datastore-cluster-name>
+            systemVolume: true
+          - quantity: 100
+            datastoreClusterName: <datastore-cluster-name>
+            path: /var/lib/kubelet
+            format: xfs
+          - quantity: 100
+            datastoreClusterName: <datastore-cluster-name>
+            path: /var/lib/containerd
+            format: xfs
+          - quantity: 10
+            datastoreClusterName: <datastore-cluster-name>
+            path: /var/lib/etcd
+            format: xfs
+      ipHostPoolRef:
+        name: dcs-workloadcluster-cp-ippool
