@@ -1,7 +1,8 @@
 # Global 上的 DCS VM 模板映射。官方要求在创建 DCSMachineTemplate 之前 apply。
 # label cpaas.io/dcs-vm-template 的值必须等于 DCS 控制台上的 VM 模板名。
 # data.* 必须和 ACP v4.3.2 OS 支持矩阵、以及该模板内置的 Kubernetes 组件一致。
-# vmImageVersion 填 DCS 模板对应的 Alauda OS 镜像版本，不要抄旧环境或 4.2 示例。
+# This environment template name: slem-alaudaos-vda (not 44slem-alaudaos-vda).
+# vmImageVersion 填该模板对应的 Alauda OS 镜像版本，不要抄旧环境或 4.2 示例。
 # 若 Global 上已经有 label 匹配、且 data 与 v1.34.5-3 一致的 ConfigMap，不要重复创建。
 apiVersion: v1
 kind: ConfigMap
@@ -9,7 +10,7 @@ metadata:
   name: 432-dcs-vm-template
   namespace: cpaas-system
   labels:
-    cpaas.io/dcs-vm-template: <alauda-os-vm-template-name>
+    cpaas.io/dcs-vm-template: slem-alaudaos-vda
     cpaas.io/distribution-version: v4.3.2
     cpaas.io/kubernetes-version: "v1.34"
 data:

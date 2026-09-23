@@ -2,8 +2,11 @@
 # Name must match DCSCluster. Must not be global.
 # Must not set is-global: "true" (that label is only for the Global cluster).
 # CIDRs must not overlap Global, olvm-workloadcluster, host networks, or each other.
+# This environment:
+#   pods 100.210.0.0/16  services 100.200.0.0/16  join 100.66.0.0/16
 # olvm-workloadcluster already uses:
 #   pods 100.13.0.0/16  services 100.14.0.0/16  join 100.15.0.0/16
+# Other environments: pick three unused /16s. Do not copy these values.
 # Registry is read at create time and cannot be migrated later.
 # Do not pre-set controller-computed annotations such as cpaas.io/cpu-cores-number.
 # Alauda OS: omit cpaas.io/os-family (unset is treated as slemicro).
@@ -18,7 +21,7 @@ metadata:
     capi.cpaas.io/resource-group-version: infrastructure.cluster.x-k8s.io/v1beta1
     capi.cpaas.io/resource-kind: DCSCluster
     capi.cpaas.io/kubernetes: v1.34.5-3
-    cpaas.io/kube-ovn-join-cidr: <kube-ovn-join-cidr>
+    cpaas.io/kube-ovn-join-cidr: 100.66.0.0/16
     cpaas.io/kube-ovn-version: v4.3.11
     cpaas.io/registry-address: 10.243.166.5:11443
     cpaas.io/nodes-mode: self-managed
@@ -26,10 +29,10 @@ spec:
   clusterNetwork:
     pods:
       cidrBlocks:
-        - <pods-cidr>
+        - 100.210.0.0/16
     services:
       cidrBlocks:
-        - <services-cidr>
+        - 100.200.0.0/16
   controlPlaneRef:
     apiVersion: controlplane.cluster.x-k8s.io/v1beta1
     kind: KubeadmControlPlane

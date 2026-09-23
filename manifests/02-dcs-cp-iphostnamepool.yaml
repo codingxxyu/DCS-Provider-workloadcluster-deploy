@@ -4,7 +4,10 @@
 # dns is a string. Separate multiple servers with ";".
 # /var/cpaas belongs here, not on DCSMachineTemplate.
 # Pool size must be >= KubeadmControlPlane.spec.replicas (this project: 3).
+# This environment CP: 10.243.166.41-43/26, gw 10.243.166.1, dns 10.243.132.38.
+# Do not put VIP 10.243.166.13 in this pool.
 # Do not reuse IPs from olvm-workloadcluster or any other live DCSIpHostnamePool.
+# Other environments: three unused addresses; mask is prefix length only.
 apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
 kind: DCSIpHostnamePool
 metadata:
@@ -12,44 +15,44 @@ metadata:
   namespace: cpaas-system
 spec:
   pool:
-    - ip: "<cp-ip-1>"
-      mask: "<cp-cidr-prefix-length>"
-      gateway: "<cp-gateway>"
-      dns: "<cp-dns>"
+    - ip: "10.243.166.41"
+      mask: "26"
+      gateway: "10.243.166.1"
+      dns: "10.243.132.38"
       hostname: "dcs-workloadcluster-cp-1"
       machineName: "dcs-workloadcluster-cp-1"
       persistentDisk:
         - slot: 0
-          quantityGB: <cpaas-disk-gb>
-          datastoreClusterName: <datastore-cluster-name>
+          quantityGB: 100
+          datastoreClusterName: jkt01-POC-DEV-DCS-01
           path: /var/cpaas
           format: xfs
           mountOptions:
             - defaults
-    - ip: "<cp-ip-2>"
-      mask: "<cp-cidr-prefix-length>"
-      gateway: "<cp-gateway>"
-      dns: "<cp-dns>"
+    - ip: "10.243.166.42"
+      mask: "26"
+      gateway: "10.243.166.1"
+      dns: "10.243.132.38"
       hostname: "dcs-workloadcluster-cp-2"
       machineName: "dcs-workloadcluster-cp-2"
       persistentDisk:
         - slot: 0
-          quantityGB: <cpaas-disk-gb>
-          datastoreClusterName: <datastore-cluster-name>
+          quantityGB: 100
+          datastoreClusterName: jkt01-POC-DEV-DCS-01
           path: /var/cpaas
           format: xfs
           mountOptions:
             - defaults
-    - ip: "<cp-ip-3>"
-      mask: "<cp-cidr-prefix-length>"
-      gateway: "<cp-gateway>"
-      dns: "<cp-dns>"
+    - ip: "10.243.166.43"
+      mask: "26"
+      gateway: "10.243.166.1"
+      dns: "10.243.132.38"
       hostname: "dcs-workloadcluster-cp-3"
       machineName: "dcs-workloadcluster-cp-3"
       persistentDisk:
         - slot: 0
-          quantityGB: <cpaas-disk-gb>
-          datastoreClusterName: <datastore-cluster-name>
+          quantityGB: 100
+          datastoreClusterName: jkt01-POC-DEV-DCS-01
           path: /var/cpaas
           format: xfs
           mountOptions:

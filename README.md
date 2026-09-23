@@ -4,7 +4,7 @@
 
 选定形态：**纯 DCS，Master 3 + Worker 3，高可用。** Control Plane 和 Worker 都是 DCS 上的 Alauda OS 虚拟机，由 DCS Provider 按模板克隆。本仓库不创建裸金属对象，也不把 Worker 接到 `olvm-workloadcluster` 的 Bare Metal Provider。
 
-现场用法：把 `manifests/` 拷到 Global Master 01，先填第 5 节采集表，再用 `vi` 改 YAML。按文件编号一次一个 `kubectl apply`：**00（Global 上还没有模板 ConfigMap 时）→ 02 → 03 → 04 → 05 → 06**，Master Ready 后再 **07 → 08 → 09 → 10**。`01` 永远不要 apply。不要脚本、不要 render、不要 envsubst。带 `<...>` 的 YAML 禁止 apply。
+现场用法：把 `manifests/` 拷到 Global Master 01，按第 5 节改 YAML。按文件编号一次一个 `kubectl apply`：**00（Global 上还没有模板 ConfigMap 时）→ 02 → 03 → 04 → 05 → 06**，Master Ready 后再 **07 → 08 → 09 → 10**。`01` 永远不要 apply。不要脚本、不要 render、不要 envsubst。带 `<...>` 的 YAML 禁止 apply。
 
 官方文档：
 
@@ -39,8 +39,10 @@ Kubeadm Provider: v1.0.14   （现场包 cluster-api-provider-kubeadm.amd64.v1.0
 | Global | 传统 OS，已可用 | 所有 `kubectl` 在 Global Master 01 执行，不要再写 kubeconfig 路径 |
 | 命名空间 | `cpaas-system` | 本仓库全部对象都在这里 |
 | 已有裸金属业务集群 | `olvm-workloadcluster` | 名字、VIP、CIDR、IP Pool 一律另起 |
-| 该集群 API VIP | `10.243.166.12` | DCS 集群必须另要一个 VIP |
-| 该集群 Pod / Service / join | `100.13.0.0/16` / `100.14.0.0/16` / `100.15.0.0/16` | DCS 换三段不重叠的 `/16` |
+| 该集群 API VIP | `10.243.166.12` | 不要复用 |
+| 该集群 Pod / Service / join | `100.13.0.0/16` / `100.14.0.0/16` / `100.15.0.0/16` | 不要复用 |
+| **本环境 DCS API VIP** | `10.243.166.13` | 已写入 `05` 两处 `host` |
+| **本环境 Pod / Service / join** | `100.210.0.0/16` / `100.200.0.0/16` / `100.66.0.0/16` | 已写入 `06` |
 | Global Registry | `10.243.166.5:11443` | DCS Cluster 创建时写这个；事后不能迁 |
 
 本仓库默认集群名：`dcs-workloadcluster`。Workload 名不能叫 `global`，对象名不要用 `global-` 前缀。
@@ -98,7 +100,7 @@ kubectl -n cpaas-system get cluster olvm-workloadcluster \
 
 - Registry 输出 `10.243.166.5:11443`。为空或不是这个地址，停止。
 - `cpaas.io/kube-ovn-version` 写入 `manifests/06-cluster.yaml`。BM 现场用过 `v4.3.11`；Global 上读到的值不同时，以 Global 为准。
-- `dcs-workloadcluster` 的 VIP / Pod / Service / join 不得与 Global、`olvm-workloadcluster`、物理网、管理网、存储网重叠。
+- `dcs-workloadcluster` 本环境 VIP `10.243.166.13`、Pod `100.210.0.0/16`、Service `100.200.0.0/16`、join `100.66.0.0/16`，不得与 Global、`olvm-workloadcluster`、物理网、管理网、存储网重叠。其他环境不要抄这四段，另要未占用地址。
 
 ### 1.2 [Global Master 01] SSH 公钥
 
@@ -159,7 +161,7 @@ Provider **会创建/删除 DCS 上的 VM**。下面这些必须在 apply 之前
 | 项 | 说明 |
 |---|---|
 | Site | Secret 的 `site`、`DCSCluster.spec.site`、模板 / Folder / 存储 / 网络都在同一 Site |
-| 接口互联用户或域用户 | 角色 administrator。互联用户「重置/首次登录是否改密」必须为 **否**，否则建集群认证失败 |
+| 接口互联用户（API User） | **注意：角色必须 `administrator`。创建/重置该用户之后，DCS 策略「接口互联用户重置/首次登录是否改密」必须为 `No` / 否。** 设成 Yes，Provider 第一次打 API 会被强制改密，认证失败，集群创建失败。域用户不走这条，但本仓库默认 `userType: interconnect` |
 | Alauda OS VM 模板 | 把 ACP 4.3.2 的 **qcow2** 上传到 DCS，做成模板，内置 Kubernetes `v1.34.5-3`。持久盘要求模板 4.2.1+。x86 与 ARM 模板不通用 |
 | VM Folder | `location.type: folder` 时 Folder 必须已存在。本 YAML 写了 folder，现场没有 Folder 就先建，不要删这个字段去碰运气 |
 | DVS / Port Group | 主网卡用；目标计算集群的主机必须都能连这块网 |
@@ -172,7 +174,7 @@ Provider **会创建/删除 DCS 上的 VM**。下面这些必须在 apply 之前
 从 Global Master 01 先探活（地址换成现场 VRM / 一台 DCS 主机 MGMT）：
 
 ```bash
-nc -vz <dcs-vrm-vip> 7443
+nc -vz 10.243.166.4 7443
 nc -vz <dcs-host-mgmt-ip> 8443
 ```
 
@@ -184,7 +186,7 @@ DCS Provider **不**维护后端成员。apply 之前把 listener 建好。
 
 ```text
 Protocol: TCP passthrough（API Server 终结 TLS，LB 不要卸 TLS）
-Frontend: <workload-api-vip>:6443
+Frontend: 10.243.166.13:6443   （其他环境换成该环境 VIP）
 Backends: 三台 CP IP:6443
 不要加 Worker
 ```
@@ -194,38 +196,16 @@ Backends: 三台 CP IP:6443
 CP VM 还没克隆出来时，后端可以先空着，但 VIP 和 TCP 6443 listener 必须已经在。KCP Ready 之后必须把三台 CP IP 加进去。
 
 ```bash
-nc -vz <workload-api-vip> 6443
+nc -vz 10.243.166.13 6443
 ```
+
+其他环境把 `10.243.166.13` 换成那个环境的 Workload API VIP。
 
 KCP 起来之前这条可能失败。apply 之后不要改 endpoint，它会进证书和 kubeconfig。扩缩容或替换 CP VM 时，由运维改 LB 成员。
 
-## 5. 采集表（先填完再改 YAML）
+## 5. 按文件改 YAML（路径 + 片段）
 
-把确认过的值记在这里（纸、工单、自己的笔记都可以）。**不要把密码写进 git。** 表里空着的项，对应 YAML 里的 `<...>` 就还不能 apply。
-
-`quantity`、`quantityGB` 在 YAML 里是数字，不要加引号。`mask` 是字符串，只写前缀长度，例如 `"24"`。
-
-| 采集项 | 写入文件 | 现场值 |
-|---|---|---|
-| DCS VM 模板名 | `00` label、`03` / `08` 的 `vmTemplateName` | |
-| Alauda OS 镜像版本 `vmImageVersion` | `00` `data.vmImageVersion` | |
-| DCS endpoint（含 `http(s)://` 和端口，默认 7443） | 第 7 节 Secret | |
-| DCS site ID | Secret 和 `05` `spec.site` | |
-| DCS 用户 / 密码 | 只进 Secret，不进 YAML 文件 | |
-| VM Folder | `03` / `08` `location.name` | |
-| DVS / Port Group | `03` / `08` | |
-| Datastore Cluster 名（或单个 Datastore 名） | `02` / `03` / `07` / `08` 所有盘 | |
-| CP vCPU / 内存 MB | `03` | |
-| Worker vCPU / 内存 MB | `08` | |
-| `/var/cpaas` 容量 GB | `02` / `07` `quantityGB` | |
-| CP IP ×3、mask、gw、DNS | `02` | |
-| Worker IP ×3、mask、gw、DNS | `07` | |
-| Workload API VIP | `05` 两处 `host` | |
-| Pod CIDR / Service CIDR / join CIDR | `06` | |
-| kube-ovn 版本 | `06` `cpaas.io/kube-ovn-version` | 从 Global 读 |
-| Registry | `06` `cpaas.io/registry-address` | 默认 `10.243.166.5:11443` |
-| SSH 公钥 | `04` / `09` | Global Master 01 `/root/.ssh/*.pub` |
-| `controlPlaneHA.enabled` | `05` | 默认 `false`；计算集群已开 DRS 且能打散 3 台 CP 才改 `true` |
+`quantity`、`quantityGB` 是数字，不要加引号。`mask` 是字符串，只写前缀长度，例如 `"24"`。**不要把密码写进 git。** 除 `01` 外还有 `<...>` 就禁止 apply。
 
 `PROVIDER_ID` 和 `NODE_IP` **不要改**。这是官方 magic token，provider 会换成例如 `dcs://<dcsmachine-name>` 和池里的 IP。改掉或加引号，节点加不进去。
 
@@ -238,43 +218,288 @@ grep -nE '<[^>]+>|填写实际' manifests/*.yaml \
 
 `04` / `09` 里的 `PROVIDER_ID`、`NODE_IP` 不含 `<`，不会出现在这份 grep 里。除此之外有任何 `<...>` 都停止。
 
-### 5.1 每个文件改什么
+本环境已经写死、**不要再改** 的四项：
 
-| 文件 | 字段 | 怎么填 |
+| 项 | 本环境值 | 文件 |
 |---|---|---|
-| `00-dcs-vm-template-configmap.yaml` | `metadata.labels.cpaas.io/dcs-vm-template` | DCS 控制台上的模板名，必须和 `03` / `08` 的 `vmTemplateName` 相同 |
-| `00` | `data.vmImageVersion` | 该模板对应的 Alauda OS 镜像版本 |
-| `00` | `data.kubernetesVersion` / `corednsTag` / `etcdTag` | 已按 4.3.2 写好。ConfigMap 里的值和 DCS 模板实际内置版本不一致时停止 |
-| `01-dcs-secret.example.yaml` | 不要 apply | 字段说明。用第 7 节命令建 Secret |
-| `02-dcs-cp-iphostnamepool.yaml` | `ip` / `mask` / `gateway` / `dns` | 三台 CP。`mask` 只写 `24` 这种前缀，不要 `/24`，不要 `255.255.255.0`。多个 DNS 用 `;` |
-| `02` | `hostname` / `machineName` | 默认 `dcs-workloadcluster-cp-1` … `cp-3`。这是 DCS 上的 VM 名，不要和其他集群撞 |
-| `02` | `persistentDisk[].quantityGB` | `/var/cpaas` 容量，整数 |
-| `02` | `datastoreClusterName` | 已有 Datastore Cluster。只有单个 Datastore 时改成 `datastoreName` |
-| `03-dcs-cp-machine-template.yaml` | `vmTemplateName` | 与 `00` 的 label 相同 |
-| `03` | `location.name` | 已存在的 Folder |
-| `03` | `dvSwitchName` / `portGroupName` | 已存在 |
-| `03` | `dcsMachineCpuSpec.quantity` | 核数，整数 |
-| `03` | `dcsMachineMemorySpec.quantity` | **MB**，整数。例如 32GiB 写成 `32768` |
-| `03` | 各盘存储字段 | 与池子同一套跨主机存储 |
-| `03` | `ipHostPoolRef.name` | 必须是 `dcs-workloadcluster-cp-ippool` |
-| `04-kubeadm-control-plane.yaml` | `sshAuthorizedKeys` | 公钥完整一行 |
-| `04` | `users[0].sudo` / `shell` | 官方 DCS KCP 附录可以不写这两项。本仓库给了 `boot` `NOPASSWD` 和 `/bin/bash`，方便现场 SSH 排障，可保留 |
-| `04` | `machineTemplate.infrastructureRef.name` | 必须是 `dcs-workloadcluster-cp-template` |
-| `05-dcscluster.yaml` | `controlPlaneLoadBalancer.host` 和 `controlPlaneEndpoint.host` | 新 VIP，两处必须相同 |
-| `05` | `credentialSecretRef.name` | `dcs-workloadcluster-dcs-secret`，必须已存在 |
-| `05` | `site` | 与 Secret 的 `site` 一致 |
-| `06-cluster.yaml` | `cpaas.io/kube-ovn-join-cidr` | 新的 `/16`，不要 `100.15.0.0/16` |
-| `06` | `cpaas.io/kube-ovn-version` | 从 Global Cluster 读 |
-| `06` | `cpaas.io/registry-address` | 默认 `10.243.166.5:11443` |
-| `06` | `capi.cpaas.io/kubernetes` | `v1.34.5-3` |
-| `06` | Pod / Service CIDR | 新的 `/16`，不要 `100.13.0.0/16`、`100.14.0.0/16` |
-| `06` | `controlPlaneRef.name` | 必须是 `dcs-workloadcluster-kcp` |
-| `06` | `infrastructureRef.name` | 必须是 `dcs-workloadcluster` |
-| `07-dcs-worker-iphostnamepool.yaml` | 与 `02` 相同规则 | 三台 Worker IP，不要和 CP / VIP 重复 |
-| `08-dcs-worker-machine-template.yaml` | 与 `03` 相同来源 | Worker CPU/内存可以和 CP 不同；**不要**加 `/var/lib/etcd` |
-| `08` | `ipHostPoolRef.name` | 必须是 `dcs-workloadcluster-worker-ippool` |
-| `09-worker-kubeadm-config-template.yaml` | `sshAuthorizedKeys` | 与 KCP 同一把公钥 |
-| `10-worker-machine-deployment.yaml` | `replicas: 3` | 本项目 3+3。`bootstrap.configRef.name` 必须是 `dcs-workloadcluster-worker-kct`；`infrastructureRef.name` 必须是 `dcs-workloadcluster-worker-template` |
+| Workload API VIP | `10.243.166.13` | `manifests/05-dcscluster.yaml` 两处 `host` |
+| CP IP / mask / gw / DNS | `10.243.166.41` `.42` `.43` / `26` / `10.243.166.1` / `10.243.132.38` | `manifests/02-dcs-cp-iphostnamepool.yaml` |
+| Worker IP / mask / gw / DNS | `10.243.166.44` `.45` `.46` / `26` / `10.243.166.1` / `10.243.132.38` | `manifests/07-dcs-worker-iphostnamepool.yaml` |
+| Pod CIDR | `100.210.0.0/16` | `manifests/06-cluster.yaml` |
+| Service CIDR | `100.200.0.0/16` | `manifests/06-cluster.yaml` |
+| join CIDR | `100.66.0.0/16` | `manifests/06-cluster.yaml` |
+| Site ID | `1C7F1082`（门户 Name 是 `site`） | `manifests/05-dcscluster.yaml` `spec.site`，Secret `site` |
+| VM 模板名 | `slem-alaudaos-vda`（不要写成 `44slem-alaudaos-vda`） | `00` label、`03` / `08` `vmTemplateName` |
+| VM Folder | `ACP_Cluster` | `03` / `08` `location.name` |
+| DCS endpoint | `https://10.243.166.4:7443` | 第 7 节 Secret，不进 apply 的 YAML |
+| API User | `acpapi` | 第 7 节 Secret `authUser`；密码不进 git |
+| 计算集群 | `ManagementCluster`（当前 1 Host，不是 YAML 字段） | 落位由 DCS 决定；`controlPlaneHA.enabled` 保持 `false` |
+| DVS / Port Group | `ManagementDVS` / `VLAN-329` | `03` / `08` |
+| Datastore Cluster | `jkt01-POC-DEV-DCS-01` | `02` / `03` / `07` / `08` 所有盘 |
+| `/var/cpaas` | `100` GB | `02` / `07` `quantityGB` |
+| Worker CPU / 内存 | `8` 核 / `16384` MB（8C16G） | `08` |
+| CP CPU / 内存 | `16` 核 / `32768` MB（16C32G） | `03` |
+
+其他环境：另要一个未占用 VIP，另要三段未占用 `/16`。不要抄 `olvm-workloadcluster` 的 `10.243.166.12` / `100.13.0.0/16` / `100.14.0.0/16` / `100.15.0.0/16`，也不要无脑抄本环境这四段。
+
+### 5.1 `manifests/00-dcs-vm-template-configmap.yaml`
+
+Global 上还没有匹配的模板 ConfigMap 时才改、才 apply。已有且版本是 `v1.34.5-3` / `1.14.2-v4.3.11` / `v3.5.28-260625` 则跳过 `00`，只把已有 label 抄进 `03` / `08`。
+
+改这两处，必须和 DCS 控制台上的模板一致，也必须和 `03` / `08` 的 `vmTemplateName` 相同：
+
+```yaml
+  labels:
+    cpaas.io/dcs-vm-template: slem-alaudaos-vda
+    cpaas.io/distribution-version: v4.3.2
+    cpaas.io/kubernetes-version: "v1.34"
+data:
+  kubernetesVersion: v1.34.5-3
+  corednsTag: 1.14.2-v4.3.11
+  etcdTag: v3.5.28-260625
+  vmImageVersion: <alauda-os-vm-image-version>
+```
+
+| 字段 | 本环境 | 其他环境 |
+|---|---|---|
+| `cpaas.io/dcs-vm-template` | 已是 `slem-alaudaos-vda`。不要写成旁边的 `44slem-alaudaos-vda` | 那个环境 DCS 上的模板名，不要抄旧环境 `aladuaos-0819` |
+| `vmImageVersion` | 该模板对应的 Alauda OS 镜像版本。**怎么看：** [DCS 控制台] Resource Pool → VM Templates → 点开 `slem-alaudaos-vda` → Summary / Basic Information 里的 Image Version / OS Version / 镜像版本。不要用模板显示名，不要用 `44slem-alaudaos-vda` 的版本。截图发我就能写进 `00` | 同上，对不上模板内置版本就停止 |
+| `kubernetesVersion` / `corednsTag` / `etcdTag` | 已按 4.3.2 写好，不要改 | 仍是 ACP 4.3.2 就保持；不是 4.3.2 不要用本仓库 |
+
+### 5.2 `manifests/01-dcs-secret.example.yaml`（禁止 apply）
+
+只说明字段。凭证用第 7 节 `kubectl create secret generic`，不要 apply 这个文件。
+
+```yaml
+stringData:
+  authUser: "acpapi"
+  authKey: "<dcs-auth-key>"
+  endpoint: "https://10.243.166.4:7443"
+  site: "1C7F1082"
+  userType: "interconnect"
+```
+
+| 字段 | 本环境 | 其他环境 |
+|---|---|---|
+| `authUser` | 已是 `acpapi`，只进 Secret，不要 apply `01` | 那个 DCS 自己的用户，禁止抄旧 Secret |
+| `authKey` | **密码不进 git、不进 YAML 文件。** 只写在 Global Master 01 的 `/root/dcs-credential.env`，建完 Secret 立刻删文件 | 那个环境自己的密码，禁止抄 |
+| `endpoint` | 已是 `https://10.243.166.4:7443`（默认 7443，不是 8443） | 那个环境 VRM URL，必须带 `http://` 或 `https://` |
+| `site` | 已是 `1C7F1082`，必须和 `05` 的 `spec.site` 相同。门户 Name 是 `site`，YAML 写 ID 不是写 `site` 这个词 | 那个环境的 Site ID |
+| `userType` | 保持 `interconnect` | 只有已开域认证、门户里已有 administrator 域用户时才改 `domain`。不要写 `1` / `2` |
+
+**注意（API User）：** 在 DCS 创建这个接口互联用户之后，角色必须是 `administrator`。然后立刻把策略改成 **No**：
+
+- 路径：[DCS 控制台] 系统管理 → 权限管理 → 权限管理策略
+- 策略：Whether to modify the password of an interface interconnection user upon password resetting and first login（接口互联用户重置/首次登录是否改密）
+- **必须为 `No` / 否**
+- 设成 Yes：用户首次被 Provider 调用就会被强制改密 → 认证失败 → 集群创建失败
+
+域用户不看这条门户策略（密码在 LDAP/AD），但本仓库默认不是域用户。
+
+### 5.3 `manifests/02-dcs-cp-iphostnamepool.yaml`
+
+三台 CP 各改一块。`hostname` / `machineName` 默认 `dcs-workloadcluster-cp-1` … `cp-3`，这是 DCS 上的 VM 名，不要和其他集群撞。`ipHostPoolRef` 在 `03` 里指向这个对象，不要改 metadata.name。
+
+```yaml
+    - ip: "10.243.166.41"
+      mask: "26"
+      gateway: "10.243.166.1"
+      dns: "10.243.132.38"
+      hostname: "dcs-workloadcluster-cp-1"
+      machineName: "dcs-workloadcluster-cp-1"
+      persistentDisk:
+        - slot: 0
+          quantityGB: 100
+          datastoreClusterName: jkt01-POC-DEV-DCS-01
+          path: /var/cpaas
+```
+
+本环境另外两条已写：`10.243.166.42` → `cp-2`，`10.243.166.43` → `cp-3`，mask/gw/dns、`quantityGB`、存储名相同。
+
+| 字段 | 本环境 | 其他环境 |
+|---|---|---|
+| `ip` ×3 | 已是 `10.243.166.41` / `.42` / `.43`，不要改成 VIP `10.243.166.13`，也不要和 Worker `.44-.46` 重复 | 那个环境三台未占用地址；VIP 不能写进 pool |
+| `mask` | 已是 `"26"`。只写前缀长度，不要 `/26`，不要 `255.255.255.192` | 按那条网的前缀长度 |
+| `gateway` / `dns` | 已是 `10.243.166.1` / `10.243.132.38`。多个 DNS 用 `;` | 那个网段的 gw/DNS |
+| `quantityGB` | 已是 `100`，整数，不要引号 | 按容量规划，整数 |
+| `datastoreClusterName` | 已是 `jkt01-POC-DEV-DCS-01`。旁边那个 `autoDS_r1rpdevdcs01` 不要用 | 只有单个 Datastore、没有 Cluster 时，把这个字段改成 `datastoreName`，值改成那个 Datastore 名。两种不要写在同一块盘上 |
+
+### 5.4 `manifests/03-dcs-cp-machine-template.yaml`
+
+```yaml
+      vmTemplateName: slem-alaudaos-vda
+      location:
+        type: folder
+        name: ACP_Cluster
+      vmConfig:
+        dvSwitchName: ManagementDVS
+        portGroupName: VLAN-329
+        dcsMachineCpuSpec:
+          quantity: 16
+        dcsMachineMemorySpec:
+          quantity: 32768
+        dcsMachineDiskSpec:
+          - quantity: 0
+            datastoreClusterName: jkt01-POC-DEV-DCS-01
+            systemVolume: true
+```
+
+后面 kubelet / containerd / etcd 三块盘的 `datastoreClusterName` 也要一起改，存储必须和 `02` 同一套。`ipHostPoolRef.name` 必须仍是 `dcs-workloadcluster-cp-ippool`。
+
+| 字段 | 本环境 | 其他环境 |
+|---|---|---|
+| `vmTemplateName` | 已是 `slem-alaudaos-vda`，与 `00` 的 label 相同 | 与那个环境 ConfigMap label 相同 |
+| `location.name` | 已是 `ACP_Cluster`（VM Folders 下已存在） | 没有 Folder 就先在 DCS 建，不要删 `type: folder` |
+| `dvSwitchName` / `portGroupName` | 已是 `ManagementDVS` / `VLAN-329`。不要写成 `managePort...` 那条 | 那个环境的 DVS / Port Group |
+| `dcsMachineCpuSpec.quantity` | 已是 `16` | 按规格，整数 |
+| `dcsMachineMemorySpec.quantity` | 已是 `32768`（16C32G，单位 **MB**） | 按规格换算成 MB |
+| 各盘存储 | 已是 `jkt01-POC-DEV-DCS-01`，与 `02` 相同 | 同上 |
+| `/var/lib/etcd` 10G | CP 必须有 | Worker 模板不要加这块盘 |
+
+### 5.5 `manifests/04-kubeadm-control-plane.yaml`
+
+只改公钥这一行。写公钥文本本身，不要写文件路径，不要写 `$(cat ...)`。`PROVIDER_ID` / `NODE_IP` 保持字面量。`machineTemplate.infrastructureRef.name` 必须是 `dcs-workloadcluster-cp-template`。
+
+```yaml
+        sshAuthorizedKeys:
+          - "<ssh-authorized-keys>"
+```
+
+| 字段 | 本环境 | 其他环境 |
+|---|---|---|
+| `sshAuthorizedKeys` | Global Master 01 `find /root/.ssh -maxdepth 1 -type f -name '*.pub'` 读出的完整一行 | 那个环境用来 SSH 进 VM 的公钥；`04` 和 `09` 必须同一把 |
+| `users[0].sudo` / `shell` | 已给 `boot` `NOPASSWD` 和 `/bin/bash`，可保留 | 可保留 |
+| `replicas` / `version` / `maxSurge: 0` | `3` / `v1.34.5-3` / `0`，不要改 | 不是 3+3 或不是 4.3.2 不要用本仓库 |
+
+### 5.6 `manifests/05-dcscluster.yaml`
+
+VIP、site 本环境已写死。`credentialSecretRef.name` 必须是已存在的 `dcs-workloadcluster-dcs-secret`。`type: external` 不要改。
+
+```yaml
+  controlPlaneLoadBalancer:
+    host: 10.243.166.13
+    port: 6443
+    type: external
+  credentialSecretRef:
+    name: dcs-workloadcluster-dcs-secret
+  controlPlaneEndpoint:
+    host: 10.243.166.13
+    port: 6443
+  controlPlaneHA:
+    enabled: false
+  networkType: kube-ovn
+  site: "1C7F1082"
+```
+
+| 字段 | 本环境 | 其他环境 |
+|---|---|---|
+| 两处 `host` | 已是 `10.243.166.13`，两处必须相同，不要改成 `10.243.166.12` | 换成那个环境的 Workload API VIP，两处仍必须相同 |
+| `site` | 已是 `1C7F1082`，与 Secret 的 `site` 相同。不要写成门户显示名 `site` | 那个环境 Site ID |
+| `controlPlaneHA.enabled` | 保持 `false`。本环境 `ManagementCluster` 当前只有 1 台 Host，不够打散 3 台 CP | 计算集群已开 DRS 且能打散 3 台 CP 才改 `true` |
+| `type` | 必须 `external` | ACP 4.3.2 不要写 `internal` |
+
+**注意：** apply `05` 之前，第 7 节的 API User / Secret 必须已经建好，并且 DCS 上「首次登录改密」已经是 **No**。凭证错或这条仍是 Yes，`DCSCluster` 会认证失败。
+
+### 5.7 `manifests/06-cluster.yaml`
+
+CIDR / Registry 本环境已写。还要确认 kube-ovn 版本与 Global 一致。`controlPlaneRef.name` 必须是 `dcs-workloadcluster-kcp`，`infrastructureRef.name` 必须是 `dcs-workloadcluster`。
+
+```yaml
+    capi.cpaas.io/kubernetes: v1.34.5-3
+    cpaas.io/kube-ovn-join-cidr: 100.66.0.0/16
+    cpaas.io/kube-ovn-version: v4.3.11
+    cpaas.io/registry-address: 10.243.166.5:11443
+    cpaas.io/nodes-mode: self-managed
+spec:
+  clusterNetwork:
+    pods:
+      cidrBlocks:
+        - 100.210.0.0/16
+    services:
+      cidrBlocks:
+        - 100.200.0.0/16
+```
+
+| 字段 | 本环境 | 其他环境 |
+|---|---|---|
+| join / pods / services | 已是 `100.66.0.0/16` / `100.210.0.0/16` / `100.200.0.0/16` | 另要三段未占用 `/16`，不要抄 BM 的 `100.13/14/15`，也不要无脑抄本环境 |
+| `cpaas.io/kube-ovn-version` | 默认 `v4.3.11`；以 Global Cluster 读到的为准 | 从那个 Global 读，不要猜 |
+| `cpaas.io/registry-address` | `10.243.166.5:11443`，创建后不能迁 | 那个环境的 Registry；空或写错就停止 |
+| 集群名 | `dcs-workloadcluster`，不要改成 `global` | 另起名字时，`05` / `06` / KCP / MD 一起改，且不要 `global-` 前缀 |
+
+### 5.8 `manifests/07-dcs-worker-iphostnamepool.yaml`
+
+规则与 `02` 相同。不要和 CP `10.243.166.41-43`、VIP `10.243.166.13` 重复。`replicas: 3`，池子必须仍是 3 条。
+
+```yaml
+    - ip: "10.243.166.44"
+      mask: "26"
+      gateway: "10.243.166.1"
+      dns: "10.243.132.38"
+      hostname: "dcs-workloadcluster-worker-1"
+      machineName: "dcs-workloadcluster-worker-1"
+      persistentDisk:
+        - slot: 0
+          quantityGB: 100
+          datastoreClusterName: jkt01-POC-DEV-DCS-01
+          path: /var/cpaas
+```
+
+本环境另外两条已写：`10.243.166.45` → `worker-2`，`10.243.166.46` → `worker-3`，mask/gw/dns、`quantityGB`、存储名相同。Master Ready 之前不要 apply `07`–`10`。
+
+| 字段 | 本环境 | 其他环境 |
+|---|---|---|
+| `ip` ×3 | 已是 `10.243.166.44` / `.45` / `.46`，不要改成 VIP `10.243.166.13`，也不要和 CP `.41-.43` 重复 | 那个环境三台未占用地址 |
+| `mask` / `gateway` / `dns` | 已是 `"26"` / `10.243.166.1` / `10.243.132.38` | 按那个网段 |
+| 存储 / `quantityGB` | 已是 `jkt01-POC-DEV-DCS-01` / `100`，与 `02` 相同 | 同上 |
+
+### 5.9 `manifests/08-dcs-worker-machine-template.yaml`
+
+来源与 `03` 相同。**不要**加 `/var/lib/etcd`。`ipHostPoolRef.name` 必须是 `dcs-workloadcluster-worker-ippool`。
+
+```yaml
+      vmTemplateName: slem-alaudaos-vda
+      location:
+        type: folder
+        name: ACP_Cluster
+      vmConfig:
+        dvSwitchName: ManagementDVS
+        portGroupName: VLAN-329
+        dcsMachineCpuSpec:
+          quantity: 8
+        dcsMachineMemorySpec:
+          quantity: 16384
+```
+
+| 字段 | 本环境 | 其他环境 |
+|---|---|---|
+| 模板 / Folder / DVS / PG / 存储 | 已与 `03` 相同：`slem-alaudaos-vda` / `ACP_Cluster` / `ManagementDVS` / `VLAN-329` / `jkt01-POC-DEV-DCS-01` | 与那个环境 CP 模板同一套，除非现场明确 Worker 用另一块网或存储 |
+| CPU / 内存 | 已是 `8` / `16384`（8C16G，内存单位 MB） | 按 Worker 规格换算成核数 + MB |
+
+### 5.10 `manifests/09-worker-kubeadm-config-template.yaml`
+
+只改公钥，必须和 `04` 同一把。`PROVIDER_ID` / `NODE_IP` 不要改。
+
+```yaml
+          sshAuthorizedKeys:
+            - "<ssh-authorized-keys>"
+```
+
+### 5.11 `manifests/10-worker-machine-deployment.yaml`
+
+本项目 3+3，`replicas: 3` 不要改。`bootstrap.configRef.name` 必须是 `dcs-workloadcluster-worker-kct`；`infrastructureRef.name` 必须是 `dcs-workloadcluster-worker-template`。`maxSurge: 0` 不要改（pool-managed `/var/cpaas`）。
+
+```yaml
+  clusterName: dcs-workloadcluster
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 0
+      maxUnavailable: 1
+```
+
+其他环境如果不是 3 个 Worker，不要只改这一处 replicas：Worker IP 池条数必须 ≥ replicas。
 
 不要改、不要删：
 
@@ -328,22 +553,51 @@ kubectl apply -f manifests/00-dcs-vm-template-configmap.yaml
 kubectl -n cpaas-system get configmap -l cpaas.io/dcs-vm-template -o yaml
 ```
 
-`00` 里还有 `<...>` 就停止。对不上模板名或 Kubernetes 版本也停止。不要猜，不要抄旧环境的 `aladuaos-0819`。
+`00` 里还有 `<...>` 就停止。对不上模板名或 Kubernetes 版本也停止。不要猜，不要抄 `44slem-alaudaos-vda` 或旧环境的 `aladuaos-0819`。
 
-## 7. [Global Master 01] 创建 DCS Secret
+## 7. 创建 DCS API User 和 Secret
 
-不要 `kubectl apply -f manifests/01-dcs-secret.example.yaml`。`apply` 会把密码写进 `last-applied-configuration`。
+### 7.1 [DCS 控制台] 接口互联用户（API User）
+
+本仓库默认 `userType: interconnect`。在 DCS 门户建用户，不要在 Kubernetes 里建。
+
+**注意（创建之后立刻做）：**
+
+1. 角色必须是 `administrator`。只读或自定义角色不行。
+2. 打开 **系统管理 → 权限管理 → 权限管理策略**。
+3. 找到 **Whether to modify the password of an interface interconnection user upon password resetting and first login**（接口互联用户重置/首次登录是否改密）。
+4. **改成 `No` / 否。** 设成 Yes：这个用户第一次被 Provider 用来打 DCS API 就会被强制改密，认证失败，集群创建失败。
+5. 用这个账号登录门户，确认能看到目标 Site、模板、Folder、DVS、Datastore。看不到，后面 `DCSCluster` 一样失败。
+6. 不要拿个人登录账号；不要从旧环境抄用户名密码。
+
+域用户不走这条门户改密策略（密码在 LDAP/AD），但本仓库不要改成 `domain`，除非 DCS 已经开了域认证、且门户里已有 administrator 域用户。控制台 Cloud Credential **只能建互联用户**。
+
+### 7.2 [Global Master 01] Secret
+
+不要 `kubectl apply -f manifests/01-dcs-secret.example.yaml`。`apply` 会把密码写进 `last-applied-configuration`。不要在 shell 里 `--from-literal` 敲密码（进 history）。用编辑器写文件，值不要加引号：
+
+```bash
+vi /root/dcs-credential.env
+chmod 600 /root/dcs-credential.env
+```
+
+```text
+authUser=acpapi
+authKey=<dcs-auth-key>
+endpoint=https://10.243.166.4:7443
+site=1C7F1082
+userType=interconnect
+```
+
+`authKey` 只在这台机器上填，**不要写进 git、不要贴进工单截图仓库、不要 apply `01`。** 本环境用户是 `acpapi`。建 Secret 前确认该用户角色是 administrator，并且「首次登录改密」已经是 **No**。
+
+`endpoint` 必须带 `http://` 或 `https://`。默认端口 **7443**，不是 8443。`userType` 只能是 `interconnect` 或 `domain`，不要写 `1` / `2`。
 
 ```bash
 kubectl -n cpaas-system create secret generic dcs-workloadcluster-dcs-secret \
-  --from-literal=authUser='<dcs-auth-user>' \
-  --from-literal=authKey='<dcs-auth-key>' \
-  --from-literal=endpoint='<dcs-endpoint>' \
-  --from-literal=site='<dcs-site-id>' \
-  --from-literal=userType='interconnect'
+  --from-env-file=/root/dcs-credential.env
+rm -f /root/dcs-credential.env
 ```
-
-`endpoint` 写成 `https://<dcs-vrm-vip>:7443` 或现场实际 URL。`userType` 只能是 `interconnect` 或 `domain`。域用户只能走 YAML/CLI，控制台建不出 `userType`。
 
 确认 key 在，不要把值打到屏幕上：
 
@@ -376,7 +630,7 @@ kubectl apply -f manifests/02-dcs-cp-iphostnamepool.yaml
 kubectl -n cpaas-system get dcsiphostnamepool dcs-workloadcluster-cp-ippool -o yaml
 ```
 
-`spec.pool` 必须正好 3 条，IP 互不相同，且不和 VIP、Worker、已有集群重复。
+`spec.pool` 必须正好 3 条。本环境应是 `10.243.166.41` / `.42` / `.43`，不要出现 VIP `10.243.166.13`，也不要和 Worker `.44-.46`、已有集群重复。其他环境换成那三台未占用地址。
 
 ```bash
 vi manifests/03-dcs-cp-machine-template.yaml
@@ -451,9 +705,11 @@ kubectl --kubeconfig /tmp/dcs-workloadcluster-kubeconfig get nodes -o wide
 然后在 **[LB 管理端]** 把三台 CP IP:6443 加进后端。再查：
 
 ```bash
-nc -vz <workload-api-vip> 6443
-curl -kfsS https://<cp-ip-1>:6443/healthz
+nc -vz 10.243.166.13 6443
+curl -kfsS https://10.243.166.41:6443/healthz
 ```
+
+其他环境把 VIP / 第一台 CP IP 换成那个环境的值。
 
 `healthz` 应返回 `ok`。
 
@@ -488,7 +744,7 @@ grep -nE '<[^>]+>|填写实际' \
   manifests/10-worker-machine-deployment.yaml
 ```
 
-`09` 不应该再有 `<...>`。
+`09` 不应该再有 `<...>`。`07` 里本环境 Worker 必须是 `10.243.166.44` / `.45` / `.46`。
 
 ```bash
 kubectl apply --dry-run=server -f manifests/07-dcs-worker-iphostnamepool.yaml
@@ -542,7 +798,12 @@ kubectl -n cpaas-system get clustermodule dcs-workloadcluster \
 - server dry-run 失败（常见原因：`<cpaas-disk-gb>` 这种数字位还没换成整数，YAML 都不是合法文档）
 - Secret 不存在，或缺 `authUser` / `authKey` / `endpoint` / `site`
 - `sshAuthorizedKeys` 仍是占位
-- VIP 仍是 `10.243.166.12`，或 CIDR 仍是 `100.13.0.0/16` / `100.14.0.0/16` / `100.15.0.0/16`
+- 本环境 VIP 不是 `10.243.166.13`，或仍是 `10.243.166.12`；CIDR 仍是 `100.13.0.0/16` / `100.14.0.0/16` / `100.15.0.0/16`
+- 本环境 CP IP 不是 `10.243.166.41-43`，或把 VIP 写进了 IP Pool
+- 本环境 Worker IP 不是 `10.243.166.44-46`，或与 CP / VIP 重复
+- DCS API User 角色不是 administrator，或「首次登录改密」仍是 Yes
+- 本环境 site 不是 `1C7F1082`，或模板名写成了 `44slem-alaudaos-vda`
+- 本环境 endpoint 不是 `https://10.243.166.4:7443`
 - 集群名叫 `global`，或写了 `is-global: "true"`
 - DCS / Kubeadm Provider 版本不是现场 4.3.2 包
 - ConfigMap 的模板名、Kubernetes 版本和 YAML / DCS 模板不一致
@@ -558,7 +819,7 @@ kubectl -n cpaas-system get clustermodule dcs-workloadcluster \
 | 现象 | 先看 |
 |---|---|
 | dry-run 失败 | 数字位是否还是 `<...>`；CRD 是否已装；namespace 是否 `cpaas-system` |
-| Secret 认证失败 | 互联用户首次改密是否关闭；endpoint 端口；site 是否同一站点 |
+| Secret 认证失败 | API User 角色是否 administrator；**首次登录改密是否已改成 No**；endpoint 是否 7443；site 是否同一站点 |
 | VM 一直 `creating` | DCS 存储、主机过载、`cdRomFile`、DeployVM 任务 |
 | Ignition / 上传失败 | Global → 每台可能落克隆的物理主机 MGMT；存储是否支持上传或 NFS |
 | Machine Provisioned 但 Node 没有 | **[Workload kubeconfig]** 看 Node，不要用 Global `get nodes` |

@@ -1,6 +1,7 @@
 # Worker DCSMachineTemplate.
 # Official required disks for worker:
 #   systemVolume, /var/lib/kubelet 100G, /var/lib/containerd 100G.
+# This environment: template slem-alaudaos-vda, folder ACP_Cluster.
 # No /var/lib/etcd on workers. /var/cpaas is on the worker IP pool.
 apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
 kind: DCSMachineTemplate
@@ -10,27 +11,27 @@ metadata:
 spec:
   template:
     spec:
-      vmTemplateName: <alauda-os-vm-template-name>
+      vmTemplateName: slem-alaudaos-vda
       location:
         type: folder
-        name: <dcs-vm-folder-name>
+        name: ACP_Cluster
       vmConfig:
-        dvSwitchName: <dv-switch-name>
-        portGroupName: <port-group-name>
+        dvSwitchName: ManagementDVS
+        portGroupName: VLAN-329
         dcsMachineCpuSpec:
-          quantity: <worker-cpu-cores>
+          quantity: 8
         dcsMachineMemorySpec:
-          quantity: <worker-memory-mb>
+          quantity: 16384
         dcsMachineDiskSpec:
           - quantity: 0
-            datastoreClusterName: <datastore-cluster-name>
+            datastoreClusterName: jkt01-POC-DEV-DCS-01
             systemVolume: true
           - quantity: 100
-            datastoreClusterName: <datastore-cluster-name>
+            datastoreClusterName: jkt01-POC-DEV-DCS-01
             path: /var/lib/kubelet
             format: xfs
           - quantity: 100
-            datastoreClusterName: <datastore-cluster-name>
+            datastoreClusterName: jkt01-POC-DEV-DCS-01
             path: /var/lib/containerd
             format: xfs
       ipHostPoolRef:

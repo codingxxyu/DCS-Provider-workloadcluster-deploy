@@ -2,9 +2,11 @@
 # ACP v4.3.2: controlPlaneLoadBalancer.type must be external.
 # type: internal (Self-built VIP) requires DCS Provider v1.0.22+ AND ACP v4.4+.
 # host and controlPlaneEndpoint.host must be the reserved Workload API VIP.
-# Do not reuse olvm-workloadcluster VIP 10.243.166.12.
-# controlPlaneHA.enabled: set true only when the target DCS compute cluster
-# already has DRS and enough hosts for 3 control-plane VMs. Default is false.
+# This environment: 10.243.166.13. Do not reuse olvm-workloadcluster VIP 10.243.166.12.
+# Other environments: another unused IPv4; both host fields must stay identical.
+# This environment site ID: 1C7F1082 (portal Name is "site").
+# This environment compute cluster is ManagementCluster, currently 1 host.
+# Keep controlPlaneHA.enabled: false until there are enough hosts for 3 CP VMs.
 apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
 kind: DCSCluster
 metadata:
@@ -12,15 +14,15 @@ metadata:
   namespace: cpaas-system
 spec:
   controlPlaneLoadBalancer:
-    host: <workload-api-vip>
+    host: 10.243.166.13
     port: 6443
     type: external
   credentialSecretRef:
     name: dcs-workloadcluster-dcs-secret
   controlPlaneEndpoint:
-    host: <workload-api-vip>
+    host: 10.243.166.13
     port: 6443
   controlPlaneHA:
     enabled: false
   networkType: kube-ovn
-  site: <dcs-site-id>
+  site: "1C7F1082"
