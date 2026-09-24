@@ -2,7 +2,8 @@
 # label cpaas.io/dcs-vm-template 的值必须等于 DCS 控制台上的 VM 模板名。
 # data.* 必须和 ACP v4.3.2 OS 支持矩阵、以及该模板内置的 Kubernetes 组件一致。
 # This environment template name: slem-alaudaos-vda (not 44slem-alaudaos-vda).
-# vmImageVersion is UI-only (portal dropdown). YAML / kubectl apply does not need it.
+# vmImageVersion: only needed when creating the cluster from the UI (portal dropdown).
+# This repo deploys with kubectl / CLI, so do not set vmImageVersion here.
 # Do not copy the 4.2 example alaudaos-42.m55.202512081125-0.x86_64 into this 4.3.2 map.
 # 若 Global 上已经有 label 匹配、且 data 与 v1.34.5-3 一致的 ConfigMap，不要重复创建。
 apiVersion: v1

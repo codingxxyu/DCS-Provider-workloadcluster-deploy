@@ -2,6 +2,7 @@
 # Official required disks for worker:
 #   systemVolume, /var/lib/kubelet 100G, /var/lib/containerd 100G.
 # This environment: template slem-alaudaos-vda, folder ACP_Cluster.
+# This environment has no Datastore Cluster; disks use datastoreName.
 # No /var/lib/etcd on workers. /var/cpaas is on the worker IP pool.
 apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
 kind: DCSMachineTemplate
@@ -24,14 +25,14 @@ spec:
           quantity: 16384
         dcsMachineDiskSpec:
           - quantity: 0
-            datastoreClusterName: jkt01-POC-DEV-DCS-01
+            datastoreName: jkt01-POC-DEV-DCS-01
             systemVolume: true
           - quantity: 100
-            datastoreClusterName: jkt01-POC-DEV-DCS-01
+            datastoreName: jkt01-POC-DEV-DCS-01
             path: /var/lib/kubelet
             format: xfs
           - quantity: 100
-            datastoreClusterName: jkt01-POC-DEV-DCS-01
+            datastoreName: jkt01-POC-DEV-DCS-01
             path: /var/lib/containerd
             format: xfs
       ipHostPoolRef:

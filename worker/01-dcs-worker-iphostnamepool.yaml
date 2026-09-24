@@ -2,6 +2,7 @@
 # Same field rules as the control-plane pool.
 # This environment worker: 10.243.166.44-46/26, gw 10.243.166.1, dns 10.243.132.38.
 # Do not reuse CP 10.243.166.41-43, VIP 10.243.166.13, or olvm-workloadcluster addresses.
+# This environment has no Datastore Cluster; use datastoreName (not datastoreClusterName).
 # Other environments: three unused addresses; mask is prefix length only.
 apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
 kind: DCSIpHostnamePool
@@ -19,7 +20,7 @@ spec:
       persistentDisk:
         - slot: 0
           quantityGB: 100
-          datastoreClusterName: jkt01-POC-DEV-DCS-01
+          datastoreName: jkt01-POC-DEV-DCS-01
           path: /var/cpaas
           format: xfs
           mountOptions:
@@ -33,7 +34,7 @@ spec:
       persistentDisk:
         - slot: 0
           quantityGB: 100
-          datastoreClusterName: jkt01-POC-DEV-DCS-01
+          datastoreName: jkt01-POC-DEV-DCS-01
           path: /var/cpaas
           format: xfs
           mountOptions:
@@ -47,7 +48,7 @@ spec:
       persistentDisk:
         - slot: 0
           quantityGB: 100
-          datastoreClusterName: jkt01-POC-DEV-DCS-01
+          datastoreName: jkt01-POC-DEV-DCS-01
           path: /var/cpaas
           format: xfs
           mountOptions:
