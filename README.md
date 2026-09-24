@@ -49,7 +49,7 @@ Kubeadm Provider: v1.0.14
 | Datastore | `jkt01-POC-DEV-DCS-01` | 本环境 DCS **没有** Datastore Cluster，YAML 用 `datastoreName` |
 | CP 规格 | 16C32G（32768 MB） | 内存单位 MB |
 | Worker 规格 | 8C16G（16384 MB） | |
-| `controlPlaneHA` | `false` | 当前计算集群只有 1 台 Host |
+| `controlPlaneHA` | `false` | 只是 DCS 上把 CP VM 打散到不同 Host；本环境 1 台 Host，不用开 |
 
 `PROVIDER_ID` 和 `NODE_IP` 不要改。这是官方 token，provider 会替换。`maxSurge` 保持 `0`（pool-managed `/var/cpaas`）。
 
@@ -68,13 +68,14 @@ worker/   Worker
 
 | 文件 | 角色 | apply？ |
 |---|---|---|
-| `00-dcs-vm-template-configmap.yaml` | Global 上的 DCS VM 模板映射。CLI 部署不写 `vmImageVersion`（那是 UI 下拉用的） | Global 还没有、或版本不是 4.3.2 时才 apply |
 | `01-dcs-secret.example.yaml` | 说明 DCS API 凭证字段 | **禁止 apply** |
 | `02-dcs-cp-iphostnamepool.yaml` | 3 条 CP IP + `/var/cpaas` | 要 |
 | `03-dcs-cp-machine-template.yaml` | CP 规格：模板 / Folder / 网 / 盘 | 要 |
 | `04-kubeadm-control-plane.yaml` | 3 个 Master 的 KubeadmControlPlane | 要 |
 | `05-dcscluster.yaml` | External VIP + site + Secret 引用 | 要 |
 | `06-cluster.yaml` | CAPI Cluster，这一步开始克隆 CP VM | 要 |
+
+DCS VM 模板 ConfigMap（含 `vmImageVersion`）只给 **UI / 门户** 创建集群用。本仓库走 CLI，不提供、也不 apply 这份 ConfigMap。`cp/03` / `worker/02` 的 `vmTemplateName` 直接写 DCS 控制台上的模板名。
 
 官方顺序：Secret → IP Pool → MachineTemplate → **KCP → DCSCluster → Cluster**。
 
@@ -153,37 +154,7 @@ kubectl -n cpaas-system get secret dcs-workloadcluster-dcs-secret \
 
 必须列出 `authUser`、`authKey`、`endpoint`、`site`。
 
-### 2. VM 模板 ConfigMap（按需）
-
-文件：`cp/00-dcs-vm-template-configmap.yaml`
-
-```bash
-kubectl -n cpaas-system get configmap -l cpaas.io/dcs-vm-template -o yaml
-```
-
-已有且版本对、label 等于现场模板名：跳过，不要 apply `cp/00`。
-
-否则按现场改这些字段（必须和 DCS 控制台、以及 `cp/03` / `worker/02` 的 `vmTemplateName` 相同）：
-
-```yaml
-  labels:
-    cpaas.io/dcs-vm-template: slem-alaudaos-vda   # 按现场 DCS 模板名改
-    cpaas.io/distribution-version: v4.3.2         # 不是 4.3.2 不要用本仓库
-    cpaas.io/kubernetes-version: "v1.34"
-data:
-  kubernetesVersion: v1.34.5-3                    # 跟模板内置版本走
-  corednsTag: 1.14.2-v4.3.11
-  etcdTag: v3.5.28-260625
-```
-
-不要写 `vmImageVersion`。那个字段只给 **UI / 门户** 下拉用。本仓库走 **CLI / kubectl apply**，不需要。
-
-```bash
-kubectl apply --dry-run=server -f cp/00-dcs-vm-template-configmap.yaml
-kubectl apply -f cp/00-dcs-vm-template-configmap.yaml
-```
-
-### 3. CP IP Pool
+### 2. CP IP Pool
 
 文件：`cp/02-dcs-cp-iphostnamepool.yaml`
 
@@ -210,12 +181,12 @@ kubectl apply --dry-run=server -f cp/02-dcs-cp-iphostnamepool.yaml
 kubectl apply -f cp/02-dcs-cp-iphostnamepool.yaml
 ```
 
-### 4. CP MachineTemplate
+### 3. CP MachineTemplate
 
 文件：`cp/03-dcs-cp-machine-template.yaml`
 
 ```yaml
-      vmTemplateName: slem-alaudaos-vda           # 必须和 cp/00 的 label 相同
+      vmTemplateName: slem-alaudaos-vda           # 按现场 DCS 模板名改
       location:
         type: folder
         name: ACP_Cluster                         # 按现场 Folder 改；没有就先在 DCS 建
@@ -247,7 +218,7 @@ kubectl apply --dry-run=server -f cp/03-dcs-cp-machine-template.yaml
 kubectl apply -f cp/03-dcs-cp-machine-template.yaml
 ```
 
-### 5. KubeadmControlPlane
+### 4. KubeadmControlPlane
 
 文件：`cp/04-kubeadm-control-plane.yaml`
 
@@ -272,11 +243,13 @@ kubectl apply -f cp/04-kubeadm-control-plane.yaml
 
 这一步还不会克隆 VM。
 
-### 6. DCSCluster
+### 5. DCSCluster
 
 文件：`cp/05-dcscluster.yaml`
 
 两处 `host` 必须相同。`type` 必须 `external`。
+
+`controlPlaneHA` 不是「要不要 3 个 Master」（那是 `cp/04` 的 `replicas: 3`）。它只让 Provider 在 DCS 上建一条 DRS 互斥规则，尽量把三台 CP 虚拟机落到不同物理主机。开了以后：计算集群必须已开 DRS，而且 Host 数量和容量够打散 3 台；否则规则会一直 Pending，VM 还是可能堆在同一台 Host 上。本环境 `ManagementCluster` 目前只有 1 台 Host，打散不了，保持 `false`。没有「必须把 CP 拆到不同物理机」的需求，也不用开。
 
 ```yaml
 spec:
@@ -287,10 +260,10 @@ spec:
   credentialSecretRef:
     name: dcs-workloadcluster-dcs-secret          # 必须是第 1 步建的 Secret
   controlPlaneEndpoint:
-    host: 10.243.166.13                           # 必须和第上面 host 相同
+    host: 10.243.166.13                           # 必须和上面 host 相同
     port: 6443
   controlPlaneHA:
-    enabled: false                                # 计算集群 Host 不够打散 3 台 CP 就保持 false
+    enabled: false                                # 见上：本环境 1 台 Host，保持关
   networkType: kube-ovn
   site: "1C7F1082"                                # 必须和 Secret 的 site 相同
 ```
@@ -300,7 +273,7 @@ kubectl apply --dry-run=server -f cp/05-dcscluster.yaml
 kubectl apply -f cp/05-dcscluster.yaml
 ```
 
-### 7. Cluster
+### 6. Cluster
 
 文件：`cp/06-cluster.yaml`
 

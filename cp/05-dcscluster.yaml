@@ -5,8 +5,8 @@
 # This environment: 10.243.166.13. Do not reuse olvm-workloadcluster VIP 10.243.166.12.
 # Other environments: another unused IPv4; both host fields must stay identical.
 # This environment site ID: 1C7F1082 (portal Name is "site").
-# This environment compute cluster is ManagementCluster, currently 1 host.
-# Keep controlPlaneHA.enabled: false until there are enough hosts for 3 CP VMs.
+# controlPlaneHA is a DCS DRS anti-affinity rule for CP VMs, not K8s HA.
+# This compute cluster (ManagementCluster) currently has 1 host, so keep false.
 apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
 kind: DCSCluster
 metadata:
